@@ -59,6 +59,63 @@ def ciou(bboxes1, bboxes2):
         cious = cious.T
     return torch.sum(1-cious)
 
+
+def tiou(bboxes1, bboxes2):
+    bboxes1 = torch.sigmoid(bboxes1)
+    bboxes2 = torch.sigmoid(bboxes2)
+    rows = bboxes1.shape[0]
+    cols = bboxes2.shape[0]
+    cious = torch.zeros((rows, cols))
+    if rows * cols == 0:
+        return cious
+    exchange = False
+    if bboxes1.shape[0] > bboxes2.shape[0]:
+        bboxes1, bboxes2 = bboxes2, bboxes1
+        cious = torch.zeros((cols, rows))
+        exchange = True
+    w1 = torch.exp(bboxes1[:, 2])
+    h1 = torch.exp(bboxes1[:, 3])
+    w2 = torch.exp(bboxes2[:, 2])
+    h2 = torch.exp(bboxes2[:, 3])
+    area1 = w1 * h1
+    area2 = w2 * h2
+    center_x1 = bboxes1[:, 0]
+    center_y1 = bboxes1[:, 1]
+    center_x2 = bboxes2[:, 0]
+    center_y2 = bboxes2[:, 1]
+
+    inter_l = torch.max(center_x1 - w1 / 2,center_x2 - w2 / 2)
+    inter_r = torch.min(center_x1 + w1 / 2,center_x2 + w2 / 2)
+    inter_t = torch.max(center_y1 - h1 / 2,center_y2 - h2 / 2)
+    inter_b = torch.min(center_y1 + h1 / 2,center_y2 + h2 / 2)
+    inter_area = torch.clamp((inter_r - inter_l),min=0) * torch.clamp((inter_b - inter_t),min=0)
+
+    c_l = torch.min(center_x1 - w1 / 2,center_x2 - w2 / 2)
+    c_r = torch.max(center_x1 + w1 / 2,center_x2 + w2 / 2)
+    c_t = torch.min(center_y1 - h1 / 2,center_y2 - h2 / 2)
+    c_b = torch.max(center_y1 + h1 / 2,center_y2 + h2 / 2)
+
+    inter_diag = (center_x2 - center_x1)**2 + (center_y2 - center_y1)**2
+    c_diag = torch.clamp((c_r - c_l),min=0)**2 + torch.clamp((c_b - c_t),min=0)**2
+
+    w_diag = (w2 - w1) ** 2
+    cw_diag = torch.clamp((c_r - c_l),min=0)**2
+
+    h_diag = (h2 - h1) ** 2
+    ch_diag = torch.clamp((c_b - c_t),min=0)**2
+
+    union = area1+area2-inter_area
+    u = (inter_diag) / c_diag
+    w = w_diag / cw_diag
+    h = h_diag / ch_diag
+    iou = inter_area / union
+    tious = iou - u - w - h
+    tious = torch.clamp(tious,min=-1.0,max = 1.0)
+    if exchange:
+        tious = tious.T
+    return torch.sum(1-tious)
+
+
 def diou(bboxes1, bboxes2):
     bboxes1 = torch.sigmoid(bboxes1)
     bboxes2 = torch.sigmoid(bboxes2)
@@ -241,13 +298,16 @@ class MultiBoxLoss(nn.Module):
         if cfg.train_boxes:
             loc_p = loc_data[pos_idx].view(-1, 4)
             loc_t = loc_t[pos_idx].view(-1, 4)
-            if cfg.reg_loss == 'ciou':
-                losses['B'] = ciou(loc_p, loc_t) * cfg.bbox_alpha * 5
-            else:
-                if cfg.reg_loss == 'sl1':
-                    losses['B'] = F.smooth_l1_loss(loc_p, loc_t, reduction='sum') * cfg.bbox_alpha
-                else:
-                    raise AssertionError("Currently, bbox regression surports 'ciou' or 'sl1'.")
+
+            losses['B'] = tiou(loc_p, loc_t) * cfg.bbox_alpha * 5
+
+            # if cfg.reg_loss == 'ciou':
+            #     losses['B'] = ciou(loc_p, loc_t) * cfg.bbox_alpha * 5
+            # else:
+            #     if cfg.reg_loss == 'sl1':
+            #         losses['B'] = F.smooth_l1_loss(loc_p, loc_t, reduction='sum') * cfg.bbox_alpha
+            #     else:
+            #         raise AssertionError("Currently, bbox regression surports 'ciou' or 'sl1'.")
 
         if cfg.train_masks:
             if cfg.mask_type == mask_type.direct:

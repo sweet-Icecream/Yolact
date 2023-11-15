@@ -306,7 +306,12 @@ class RandomSampleCrop(object):
         height, width, _ = image.shape
         while True:
             # randomly choose a mode
-            mode = random.choice(self.sample_options)
+
+            # FIXME: fix inhomogeneous error of random choice
+            # mode = random.choice(self.sample_options)
+            mode_index = random.randint(0, len(self.sample_options) - 1)
+            mode = self.sample_options[mode_index]
+
             if mode is None:
                 return image, masks, boxes, labels
 
