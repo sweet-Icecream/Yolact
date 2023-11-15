@@ -299,7 +299,8 @@ class MultiBoxLoss(nn.Module):
             loc_p = loc_data[pos_idx].view(-1, 4)
             loc_t = loc_t[pos_idx].view(-1, 4)
 
-            losses['B'] = tiou(loc_p, loc_t) * cfg.bbox_alpha * 5
+            # losses['B'] = tiou(loc_p, loc_t) * cfg.bbox_alpha * 5
+            losses['B'] = ciou(loc_p, loc_t) * cfg.bbox_alpha * 5
 
             # if cfg.reg_loss == 'ciou':
             #     losses['B'] = ciou(loc_p, loc_t) * cfg.bbox_alpha * 5
