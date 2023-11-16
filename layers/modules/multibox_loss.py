@@ -60,7 +60,7 @@ def ciou(bboxes1, bboxes2):
     return torch.sum(1-cious)
 
 
-def tiou(bboxes1, bboxes2):
+def eiou(bboxes1, bboxes2):
     bboxes1 = torch.sigmoid(bboxes1)
     bboxes2 = torch.sigmoid(bboxes2)
     rows = bboxes1.shape[0]
@@ -109,11 +109,11 @@ def tiou(bboxes1, bboxes2):
     w = w_diag / cw_diag
     h = h_diag / ch_diag
     iou = inter_area / union
-    tious = iou - u - w - h
-    tious = torch.clamp(tious,min=-1.0,max = 1.0)
+    eious = iou - u - w - h
+    eious = torch.clamp(eious,min=-1.0,max = 1.0)
     if exchange:
-        tious = tious.T
-    return torch.sum(1-tious)
+        eious = eious.T
+    return torch.sum(1-eious)
 
 
 def diou(bboxes1, bboxes2):
@@ -299,8 +299,7 @@ class MultiBoxLoss(nn.Module):
             loc_p = loc_data[pos_idx].view(-1, 4)
             loc_t = loc_t[pos_idx].view(-1, 4)
 
-            # losses['B'] = tiou(loc_p, loc_t) * cfg.bbox_alpha * 5
-            losses['B'] = ciou(loc_p, loc_t) * cfg.bbox_alpha * 5
+            losses['B'] = eiou(loc_p, loc_t) * cfg.bbox_alpha * 5
 
             # if cfg.reg_loss == 'ciou':
             #     losses['B'] = ciou(loc_p, loc_t) * cfg.bbox_alpha * 5
