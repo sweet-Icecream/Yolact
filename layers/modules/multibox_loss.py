@@ -8,6 +8,47 @@ from ..box_utils import match, log_sum_exp, decode, center_size, crop, elemwise_
 
 from data import cfg, mask_type, activation_func
 
+
+def iou_(bboxes1, bboxes2):
+    bboxes1 = torch.sigmoid(bboxes1)
+    bboxes2 = torch.sigmoid(bboxes2)
+    rows = bboxes1.shape[0]
+    cols = bboxes2.shape[0]
+    ious = torch.zeros((rows, cols))
+    if rows * cols == 0:
+        return ious
+    exchange = False
+    if bboxes1.shape[0] > bboxes2.shape[0]:
+        bboxes1, bboxes2 = bboxes2, bboxes1
+        ious = torch.zeros((cols, rows))
+        exchange = True
+
+    w1 = torch.exp(bboxes1[:, 2])
+    h1 = torch.exp(bboxes1[:, 3])
+    w2 = torch.exp(bboxes2[:, 2])
+    h2 = torch.exp(bboxes2[:, 3])
+    area1 = w1 * h1
+    area2 = w2 * h2
+    center_x1 = bboxes1[:, 0]
+    center_y1 = bboxes1[:, 1]
+    center_x2 = bboxes2[:, 0]
+    center_y2 = bboxes2[:, 1]
+
+    inter_l = torch.max(center_x1 - w1 / 2,center_x2 - w2 / 2)
+    inter_r = torch.min(center_x1 + w1 / 2,center_x2 + w2 / 2)
+    inter_t = torch.max(center_y1 - h1 / 2,center_y2 - h2 / 2)
+    inter_b = torch.min(center_y1 + h1 / 2,center_y2 + h2 / 2)
+    inter_area = torch.clamp((inter_r - inter_l),min=0) * torch.clamp((inter_b - inter_t),min=0)
+    union = area1+area2-inter_area
+
+    iou = inter_area / union
+    ious = iou
+
+    if exchange:
+        ious = ious.T
+    return torch.sum(1-ious)
+
+
 def ciou(bboxes1, bboxes2):
     bboxes1 = torch.sigmoid(bboxes1)
     bboxes2 = torch.sigmoid(bboxes2)
@@ -299,8 +340,7 @@ class MultiBoxLoss(nn.Module):
             loc_p = loc_data[pos_idx].view(-1, 4)
             loc_t = loc_t[pos_idx].view(-1, 4)
 
-            # losses['B'] = tiou(loc_p, loc_t) * cfg.bbox_alpha * 5
-            losses['B'] = F.smooth_l1_loss(loc_p, loc_t, reduction='sum') * cfg.bbox_alpha
+            losses['B'] = iou_(loc_p, loc_t) * cfg.bbox_alpha * 5
 
             # if cfg.reg_loss == 'ciou':
             #     losses['B'] = ciou(loc_p, loc_t) * cfg.bbox_alpha * 5
