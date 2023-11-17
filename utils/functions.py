@@ -108,7 +108,7 @@ class SavePath:
         self.iteration = iteration
 
     def get_path(self, root:str=''):
-        file_name = self.model_name + '_' + 'ciou_' + str(self.epoch) + '_' + str(self.iteration) + '.pth'
+        file_name = self.model_name + '_' + 'diou_' + str(self.epoch) + '_' + str(self.iteration) + '.pth'
         return os.path.join(root, file_name)
 
     @staticmethod
